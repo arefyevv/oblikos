@@ -1,1 +1,0 @@
-ALTER TABLE "Content" ADD COLUMN "voiceOverride" JSONB NOT NULL DEFAULT '{}';
