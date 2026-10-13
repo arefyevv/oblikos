@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.next-e2e/
+out/
+dist/
+coverage/
+src/generated/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+*.log
+.DS_Store
+.npm-cache/
+.playwright/
+artifacts/
+data/media/

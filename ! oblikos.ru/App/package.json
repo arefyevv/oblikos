@@ -1,0 +1,90 @@
+{
+  "name": "oblikos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "video:worker": "node --conditions=react-server --import=tsx scripts/video-reference-worker.ts",
+    "video:check": "node --conditions=react-server --import=tsx scripts/check-reference-video.ts",
+    "video:smoke": "node --conditions=react-server --import=tsx scripts/smoke-performance.ts",
+    "test:performance": "node --conditions=react-server --import=tsx --test tests/performance.test.ts tests/performance.integration.test.ts tests/video-diagnostic.test.ts",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 -Server root@159.194.211.8",
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "build": "prisma generate && next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "next typegen && tsc --noEmit",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:check": "node scripts/check-database.mjs",
+    "auth:cleanup": "node scripts/cleanup-auth.mjs",
+    "email:check": "node scripts/check-email.mjs",
+    "test:email": "node --conditions=react-server --import=tsx --test tests/email.test.ts",
+    "test:auth": "node --conditions=react-server --import=tsx --test tests/auth.integration.test.ts",
+    "test:characters": "node --conditions=react-server --import=tsx --test tests/characters.integration.test.ts",
+    "test:voice": "node --conditions=react-server --import=tsx --test tests/voice.integration.test.ts",
+    "test:qwen": "node --conditions=react-server --import=tsx --test tests/qwen-speech.test.ts",
+    "test:memory": "node --conditions=react-server --import=tsx --test tests/memory.integration.test.ts",
+    "test:content": "node --conditions=react-server --import=tsx --test tests/content.integration.test.ts",
+    "test:media": "node --conditions=react-server --import=tsx --test tests/media.integration.test.ts",
+    "test:video": "node --conditions=react-server --import=tsx --test tests/video.integration.test.ts tests/google-veo.test.ts tests/kling-video.test.ts",
+    "test:avatar": "node --conditions=react-server --import=tsx --test tests/avatar.test.ts tests/video.integration.test.ts",
+    "test:video:production": "node tests/video-production-smoke.mjs",
+    "test:e2e": "playwright test",
+    "test:production": "node tests/production-smoke.mjs",
+    "test:readiness": "node --conditions=react-server --import=tsx --test tests/production-readiness.integration.test.ts",
+    "test:integration": "node --conditions=react-server --import=tsx --test tests/*.integration.test.ts tests/google-veo.test.ts tests/kling-video.test.ts",
+    "test:production:e2e": "node scripts/verify-production.mjs",
+    "security:secrets": "node scripts/check-secret-leaks.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "5.3.0",
+    "@google/genai": "2.27.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "argon2": "0.45.1",
+    "dotenv": "18.0.5",
+    "ffmpeg-static": "5.3.0",
+    "music-metadata": "^12.0.0",
+    "next": "16.3.8",
+    "next-auth": "4.24.15",
+    "nodemailer": "7.0.13",
+    "openai": "7.27.0",
+    "pg": "8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "sharp": "0.35.5",
+    "zod": "4.6.5"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.5"
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.19.1",
+    "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "prisma": "7.10.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

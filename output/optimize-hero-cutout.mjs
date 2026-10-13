@@ -1,0 +1,10 @@
+import sharp from '../! oblikos.ru/App/node_modules/sharp/dist/index.mjs';
+const source = process.argv[2];
+const target = 'E:/Projects/Oblik OS/! oblikos.ru/Site/src/assets/hero/sofia-cutout.webp';
+const image = sharp(source);
+console.log(await image.metadata());
+await image.resize({width:1120,withoutEnlargement:true}).webp({quality:90,alphaQuality:100}).toFile(target);
+const {data,info} = await sharp(target).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+let transparent = 0;
+for(let i=3;i<data.length;i+=info.channels) if(data[i] === 0) transparent++;
+console.log({target,transparentPixels:transparent});

@@ -1,0 +1,384 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum CharacterStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  name               String              @db.VarChar(120)
+  email              String?             @unique @db.VarChar(254)
+  phone              String?             @unique @db.VarChar(16)
+  avatarUrl          String?             @db.Text
+  emailVerified      DateTime?           @db.Timestamptz(3)
+  authVersion        Int                 @default(0)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  memberships        WorkspaceMember[]
+  accounts           Account[]
+  passwordCredential PasswordCredential?
+  authSessions       AuthSession[]
+  authTokens         AuthToken[]
+  linkIntents        AccountLinkIntent[]
+}
+
+model Account {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  type              String   @db.VarChar(32)
+  provider          String   @db.VarChar(32)
+  providerAccountId String   @db.VarChar(255)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+}
+
+model PasswordCredential {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @db.Uuid
+  passwordHash String   @db.Text
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Auth.js encrypted JWT carries only this session's UUID, never a credential.
+model AuthSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum AuthTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+  ADD_PASSWORD
+}
+
+model AuthToken {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  tokenHash String           @unique @db.VarChar(64)
+  purpose   AuthTokenPurpose
+  expiresAt DateTime         @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+model AccountLinkIntent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  sessionId String   @db.Uuid
+  provider  String   @db.VarChar(32)
+  tokenHash String   @unique @db.VarChar(64)
+  expiresAt DateTime @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model AuthRateLimit {
+  key       String   @id @db.VarChar(64)
+  attempts  Int      @default(1)
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id         String            @id @default(uuid()) @db.Uuid
+  name       String            @db.VarChar(120)
+  slug       String            @unique @db.VarChar(120)
+  createdAt  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime          @updatedAt @db.Timestamptz(3)
+  members    WorkspaceMember[]
+  characters Character[]
+  contents   Content[]
+  generations ContentGeneration[]
+  mediaAssets MediaAsset[]
+  mediaGenerations MediaGeneration[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Character {
+  id          String          @id @default(uuid()) @db.Uuid
+  workspaceId String          @db.Uuid
+  name        String          @db.VarChar(120)
+  slug        String          @db.VarChar(120)
+  gender      String?         @db.VarChar(80)
+  kind        String          @default("HUMAN") @db.VarChar(16)
+  ageRange    String?         @db.VarChar(80)
+  niche       String?         @db.VarChar(160)
+  biography   String?         @db.Text
+  voice       Json            @default("{}") @db.JsonB
+  status      CharacterStatus @default(DRAFT)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime?       @db.Timestamptz(3)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  appearance  Appearance?
+  personality Personality?
+  memoryEntries MemoryEntry[]
+  contents Content[]
+  generations ContentGeneration[]
+  mediaAssets MediaAsset[]
+  mediaGenerations MediaGeneration[]
+  videoSources VideoSource[]
+
+  @@unique([id, workspaceId])
+
+  // slug сохраняется за персонажем после soft delete.
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, deletedAt, updatedAt])
+  @@index([workspaceId, status])
+}
+
+// Preview receipts prevent duplicate paid calls; audio expires after one day.
+model VoicePreview {
+  id String @id @db.Uuid
+  workspaceId String @db.Uuid
+  userId String @db.Uuid
+  fingerprint String @db.VarChar(64)
+  status String @default("PROCESSING") @db.VarChar(16)
+  audio Bytes?
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+
+model Appearance {
+  id                     String    @id @default(uuid()) @db.Uuid
+  characterId            String    @unique @db.Uuid
+  hairColor              String?   @db.VarChar(120)
+  hairStyle              String?   @db.VarChar(160)
+  clothingStyle          String?   @db.Text
+  visualDescription      String?   @db.Text
+  additionalInstructions String?   @db.Text
+  attributes             Json      @default("{}") @db.JsonB
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
+  character              Character @relation(fields: [characterId], references: [id], onDelete: Restrict)
+}
+
+model Personality {
+  id                     String    @id @default(uuid()) @db.Uuid
+  characterId            String    @unique @db.Uuid
+  communicationStyle     String?   @db.Text
+  tone                   String?   @db.VarChar(160)
+  traits                 String[]  @default([])
+  description            String?   @db.Text
+  additionalInstructions String?   @db.Text
+  attributes             Json      @default("{}") @db.JsonB
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
+  character              Character @relation(fields: [characterId], references: [id], onDelete: Restrict)
+}
+
+enum MemoryType {
+  FACT
+  PREFERENCE
+  EVENT
+  RELATIONSHIP
+  GOAL
+  RULE
+  OTHER
+}
+
+model MemoryEntry {
+  id          String     @id @default(uuid()) @db.Uuid
+  characterId String     @db.Uuid
+  type        MemoryType
+  content     String     @db.VarChar(2000)
+  importance  Int        @default(3)
+  isPinned    Boolean    @default(false)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+  character   Character  @relation(fields: [characterId], references: [id], onDelete: Restrict)
+
+  // Workspace is derived from Character, avoiding conflicting tenant identifiers.
+  @@index([characterId, isPinned(sort: Desc), importance(sort: Desc), updatedAt(sort: Desc), id])
+  @@index([characterId, type])
+}
+
+enum ContentType {
+  POST
+  SHORT_POST
+  CAPTION
+  IDEA
+  DESCRIPTION
+  CUSTOM
+}
+
+enum ContentStatus {
+  DRAFT
+}
+
+model Content {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  characterId String @db.Uuid
+  type ContentType
+  instruction String @db.VarChar(5000)
+  body String @db.Text
+  voiceOverride Json @default("{}") @db.JsonB
+  status ContentStatus @default(DRAFT)
+  provider String @db.VarChar(80)
+  model String @db.VarChar(160)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  character Character @relation(fields: [characterId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc), id])
+  @@index([characterId, createdAt(sort: Desc), id])
+}
+
+// Durable request receipt: prevents duplicate provider calls across processes.
+// Content IDs remain as tombstones after deletion; no character snapshots or text.
+model ContentGeneration {
+  id String @id @db.Uuid
+  workspaceId String @db.Uuid
+  characterId String @db.Uuid
+  fingerprint String @db.VarChar(64)
+  contentId String? @db.Uuid
+  failed Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  character Character @relation(fields: [characterId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@index([characterId])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MediaGenerationStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model MediaAsset {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  characterId String @db.Uuid
+  type MediaType @default(IMAGE)
+  mimeType String @db.VarChar(32)
+  storageKey String @unique @db.VarChar(240)
+  width Int
+  height Int
+  fileSize Int
+  duration Float?
+  prompt String @db.Text
+  provider String @db.VarChar(80)
+  model String @db.VarChar(160)
+  referenceAssetId String? @db.Uuid
+  referenceUsed Boolean @default(false)
+  isPrimaryReference Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  character Character @relation(fields: [characterId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@index([workspaceId, deletedAt, createdAt(sort: Desc), id])
+  @@index([characterId, deletedAt, createdAt(sort: Desc), id])
+}
+
+// Durable receipts survive failures and deletion: one UUID never calls AI twice.
+model MediaGeneration {
+  id String @id @db.Uuid
+  workspaceId String @db.Uuid
+  characterId String @db.Uuid
+  fingerprint String @db.VarChar(64)
+  status MediaGenerationStatus @default(PENDING)
+  type MediaType @default(IMAGE)
+  provider String? @db.VarChar(80)
+  model String? @db.VarChar(160)
+  providerJobId String? @db.VarChar(240)
+  referenceAssetId String? @db.Uuid
+  prompt String? @db.Text
+  scene String? @db.Text
+  duration Int?
+  aspectRatio String? @db.VarChar(12)
+  mode String @default("IMAGE") @db.VarChar(24)
+  creatorUserId String? @db.Uuid
+  sourceId String? @db.Uuid
+  parameters Json @default("{}") @db.JsonB
+  quotedCost Decimal? @db.Decimal(12, 4)
+  costCurrency String? @db.VarChar(3)
+  submissionStartedAt DateTime? @db.Timestamptz(3)
+  pollAttempts Int @default(0)
+  errorCode String? @db.VarChar(32)
+  nextPollAt DateTime? @db.Timestamptz(3)
+  pollLeaseId String? @db.Uuid
+  pollLeaseUntil DateTime? @db.Timestamptz(3)
+  mediaId String? @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  character Character @relation(fields: [characterId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@index([characterId])
+  @@index([workspaceId, type, status])
+  @@index([referenceAssetId, status])
+}
+
+// Private, expiring inputs; never included in the public media gallery.
+model VideoSource {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  userId String @db.Uuid
+  characterId String @db.Uuid
+  kind String @db.VarChar(8)
+  storageKey String @unique @db.VarChar(240)
+  mimeType String @db.VarChar(40)
+  duration Float
+  fileSize Int
+  hasAudio Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  character Character @relation(fields: [characterId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@index([workspaceId, userId, characterId])
+  @@index([expiresAt])
+}
